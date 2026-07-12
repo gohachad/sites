@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Re-Wise — past papers into quizzes</title>
+<meta name="description" content="Turn a Cambridge IGCSE past paper PDF and its marking scheme into an interactive quiz. Fully client-side — nothing leaves your device.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-size='16' fill='%23fff' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+/* ============ Tokens — from design.md (monopo saigon), do not invent ============ */
+:root {
+  --color-obsidian: #000000;
+  --color-paper: #ffffff;
+  --color-inkstone: #181818;
+  --color-felt-gray: #6d6d6d;
+  --color-slate-pill: #636363;
+  --color-ash-mist: #9a9a9a;
+  --color-pewter: #808080;
+  --gradient-iridescent-fade: linear-gradient(90deg, rgb(160, 224, 171), rgb(255, 172, 46) 50%, rgb(165, 45, 37));
+
+  --font-roobert: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --text-caption: 12px;   --leading-caption: 1.19;
+  --text-body-sm: 16px;   --leading-body-sm: 1.15;
+  --text-body: 18px;      --leading-body: 1.21;
+  --text-subheading: 39px;    --leading-subheading: 1.19;
+  --text-subheading-lg: 45px; --leading-subheading-lg: 1.15;
+  --text-heading-sm: 54px;    --leading-heading-sm: 1.39;
+  --text-heading: 78px;       --leading-heading: 1.1;
+  --text-heading-lg: 94px;    --leading-heading-lg: 0.76;
+  --text-display: 225px;      --leading-display: 1.25;
+
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+
+  --spacing-8: 8px; --spacing-12: 12px; --spacing-28: 28px; --spacing-40: 40px;
+  --spacing-48: 48px; --spacing-64: 64px; --spacing-68: 68px; --spacing-152: 152px;
+
+  --page-max-width: 1078px;
+  --section-gap: 46px;
+  --element-gap: 14px;
+
+  --radius-tags: 75px;
+  --radius-buttons: 75px;
+
+  --ease-glide: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* ============ Base ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-roobert);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--text-body-sm);
+  line-height: 1.58;
+  color: var(--color-paper);
+  background: var(--color-obsidian);
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: var(--page-max-width); margin: 0 auto; padding: 0 24px; }
+:focus-visible { outline: 2px solid var(--color-paper); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ============ Typographic roles ============ */
+.label {
+  font-size: 11px; font-weight: var(--font-weight-regular);
+  letter-spacing: .14em; text-transform: uppercase;
+  line-height: 1.36; color: var(--color-paper);
+}
+.label--muted { color: var(--color-ash-mist); }
+.whisper {
+  font-size: clamp(34px, 6.4vw, var(--text-heading));
+  font-weight: var(--font-weight-light);
+  line-height: var(--leading-heading);
+  letter-spacing: -0.01em;
+}
+.body-copy { font-size: var(--text-body-sm); line-height: 1.58; color: #d6d6d6; max-width: 34em; }
+.muted { color: var(--color-ash-mist); }
+
+/* ============ Buttons — ghost pills only ============ */
+.pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px;
+  padding: 11px 33px;
+  border-radius: var(--radius-buttons);
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: var(--color-paper);
+  font-family: var(--font-roobert); font-size: var(--text-body-sm); font-weight: var(--font-weight-regular);
+  text-decoration: none; cursor: pointer;
+  transition: letter-spacing .8s var(--ease-glide), border-color .8s var(--ease-glide),
+              background-color .4s ease, color .4s ease, opacity .4s ease;
+}
+.pill:hover { letter-spacing: .04em; border-color: rgba(255,255,255,0.85); }
+.pill:disabled { border-color: rgba(255,255,255,0.14); color: rgba(255,255,255,0.32); cursor: not-allowed; letter-spacing: 0; }
+.pill--on { background: var(--color-paper); color: var(--color-obsidian); }
+.pill--sm { padding: 7px 22px; min-height: 40px; font-size: var(--text-caption); }
+
+/* Text links — no underline, 0px radius */
+.tlink {
+  background: none; border: none; padding: 8px 0; cursor: pointer;
+  font-family: var(--font-roobert); font-size: 11px; font-weight: var(--font-weight-regular);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--color-paper);
+  text-decoration: none;
+  transition: color .4s ease, letter-spacing .8s var(--ease-glide);
+}
+.tlink:hover { letter-spacing: .2em; }
+.tlink--muted { color: var(--color-ash-mist); }
+.tlink--muted:hover { color: var(--color-paper); }
+
+/* ============ Header ============ */
+.top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  height: 66px; display: flex; align-items: center;
+}
+.top .container { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.top__logo { font-size: var(--text-body-sm); font-weight: var(--font-weight-regular); color: var(--color-paper); text-decoration: none; }
+.top__nav { display: flex; gap: 28px; }
+.top__nav .tlink { color: rgba(255,255,255,.85); }
+.top__nav .tlink:hover { color: var(--color-paper); }
+
+/* ============ Hero — the single chromatic gesture ============ */
+.hero {
+  position: relative; overflow: hidden;
+  background: var(--color-obsidian);
+  color: var(--color-paper);
+  min-height: 72vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+}
+/* Dark purple atmosphere — the page's single chromatic gesture */
+.hero__blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .65; }
+.hero__blob--a { width: 55vw; height: 55vw; background: rgb(76,29,149); left: -12%; top: -22%; animation: drift-a 26s var(--ease-glide) infinite alternate; }
+.hero__blob--b { width: 48vw; height: 48vw; background: rgb(147,51,234); right: -8%; top: 18%; animation: drift-b 31s var(--ease-glide) infinite alternate; }
+.hero__blob--c { width: 42vw; height: 42vw; background: rgb(49,46,129); left: 24%; bottom: -30%; animation: drift-c 23s var(--ease-glide) infinite alternate; }
+@keyframes drift-a { from { transform: translate(0,0) scale(1); } to { transform: translate(14vw, 10vh) scale(1.15); } }
+@keyframes drift-b { from { transform: translate(0,0) scale(1.1); } to { transform: translate(-12vw, -6vh) scale(.9); } }
+@keyframes drift-c { from { transform: translate(0,0) scale(.95); } to { transform: translate(10vw, -12vh) scale(1.2); } }
+.hero__veil { position: absolute; inset: 0; background: rgba(0,0,0,.38); }
+.hero__inner { position: relative; z-index: 2; padding: 120px 24px 100px; }
+.hero__title {
+  font-size: clamp(64px, 16.5vw, 200px);
+  font-weight: var(--font-weight-regular);
+  line-height: 0.95;
+  letter-spacing: -0.015em;
+}
+.hero__eyebrow { margin-bottom: var(--spacing-28); color: rgba(255,255,255,.85); }
+.hero__tail { margin-top: var(--spacing-28); font-size: var(--text-body-sm); color: rgba(255,255,255,.85); font-weight: var(--font-weight-light); }
+
+/* Rotating badge — the system's one ornament */
+.badge {
+  position: absolute; left: 28px; bottom: 28px; z-index: 3;
+  width: 92px; height: 92px; pointer-events: none;
+}
+.badge svg { width: 100%; height: 100%; animation: spin 18s linear infinite; }
+.badge text { font-size: 10.5px; letter-spacing: .34em; fill: rgba(255,255,255,.85); font-family: var(--font-roobert); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ Sections ============ */
+.section { padding: var(--spacing-68) 0; }
+.section + .section { padding-top: 0; }
+.section__label { margin-bottom: var(--spacing-12); }
+.section__head { margin-bottom: var(--spacing-40); }
+
+/* ============ Upload zones ============ */
+.uploads { display: grid; grid-template-columns: 1fr 1fr; gap: var(--element-gap); margin-top: var(--spacing-40); }
+.dropzone {
+  border: 1px solid var(--color-paper); border-radius: 0;
+  padding: 34px; min-height: 168px; cursor: pointer;
+  display: flex; flex-direction: column; gap: var(--spacing-12); justify-content: space-between;
+  transition: background-color .4s ease;
+}
+.dropzone:hover, .dropzone.is-over { background: #141414; }
+.dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.dropzone__name { font-size: var(--text-body-sm); color: var(--color-ash-mist); word-break: break-all; }
+.dropzone__name.is-set { color: var(--color-paper); }
+.dropzone.is-optional { border-color: var(--color-pewter); }
+.upload-actions { margin-top: var(--spacing-28); display: flex; align-items: center; gap: var(--spacing-28); flex-wrap: wrap; }
+.upload-note { font-size: var(--text-caption); line-height: var(--leading-caption); color: var(--color-ash-mist); max-width: 44em; margin-top: var(--spacing-12); }
+
+/* ============ Editorial list rows (library, review, results) ============ */
+.rows { border-top: 1px solid var(--color-paper); }
+.row { border-bottom: 1px solid var(--color-paper); padding: var(--spacing-28) 0; }
+.row--quiet { border-bottom-color: #2e2e2e; }
+.lib-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--element-gap); flex-wrap: wrap; }
+.lib-row__title { font-size: var(--text-body); font-weight: var(--font-weight-regular); line-height: var(--leading-body); }
+.lib-row__meta { font-size: var(--text-caption); color: var(--color-ash-mist); margin-top: var(--spacing-8); }
+.lib-row__actions { display: flex; gap: 22px; align-items: center; }
+
+/* ============ Inputs — sharp 0px ============ */
+.field {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.45); border-radius: 0;
+  background: transparent;
+  font-family: var(--font-roobert); font-size: var(--text-body-sm); line-height: 1.5;
+  color: var(--color-paper);
+  padding: 12px 14px;
+  transition: background-color .4s ease, border-color .4s ease;
+}
+.field:focus { border-color: var(--color-paper); }
+.field::placeholder { color: var(--color-pewter); }
+textarea.field { resize: vertical; min-height: 84px; }
+.field--title { font-size: var(--text-body); padding: 14px; }
+.field--quiet { border-color: var(--color-pewter); }
+
+/* ============ Review ============ */
+.rev-item__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--element-gap); margin-bottom: var(--spacing-12); flex-wrap: wrap; }
+.rev-item__num { font-size: var(--text-subheading); font-weight: var(--font-weight-light); line-height: 1; }
+.rev-item__ops { display: flex; gap: 20px; flex-wrap: wrap; }
+.rev-item label.label--muted { display: block; margin: var(--spacing-12) 0 6px; }
+.rev-add { margin-top: var(--spacing-28); }
+.rev-cta { margin-top: var(--spacing-48); display: flex; gap: var(--spacing-28); align-items: center; flex-wrap: wrap; }
+details.leftover { margin-top: var(--spacing-40); }
+details.leftover summary { cursor: pointer; }
+details.leftover pre {
+  margin-top: var(--spacing-12); padding: var(--spacing-12);
+  border: 1px solid var(--color-pewter); font-size: var(--text-caption);
+  font-family: var(--font-roobert); white-space: pre-wrap; color: #d6d6d6;
+  max-height: 280px; overflow: auto;
+}
+
+/* ============ Quiz ============ */
+.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: var(--element-gap); margin-bottom: var(--spacing-12); }
+.progress { height: 2px; background: #242424; margin-bottom: var(--spacing-48); }
+.progress__bar { height: 100%; background: var(--color-paper); width: 0; transition: width .8s var(--ease-glide); }
+.quiz-num {
+  font-size: clamp(64px, 10vw, var(--text-heading-lg));
+  font-weight: var(--font-weight-light);
+  line-height: var(--leading-heading-lg);
+  margin-bottom: var(--spacing-28);
+}
+.quiz-question { font-size: clamp(18px, 2.2vw, 22px); line-height: 1.5; font-weight: var(--font-weight-regular); max-width: 42em; white-space: pre-wrap; }
+.quiz-answer { margin-top: var(--spacing-40); }
+.quiz-answer label { display: block; margin-bottom: var(--spacing-8); }
+.quiz-controls { margin-top: var(--spacing-28); display: flex; gap: var(--element-gap); align-items: center; flex-wrap: wrap; }
+.quiz-controls .spacer { flex: 1; }
+.ms-block { margin-top: var(--spacing-40); border-top: 1px solid var(--color-paper); padding-top: var(--spacing-28); }
+.ms-block[hidden] { display: none; }
+.ms-block p { white-space: pre-wrap; font-size: var(--text-body-sm); line-height: 1.58; color: #d6d6d6; max-width: 42em; margin-top: var(--spacing-8); }
+
+/* ============ Results ============ */
+.score {
+  font-size: clamp(48px, 9vw, var(--text-heading));
+  font-weight: var(--font-weight-light);
+  line-height: var(--leading-heading);
+  margin-bottom: var(--spacing-8);
+}
+.res-row__q { font-size: var(--text-body-sm); font-weight: var(--font-weight-semibold); white-space: pre-wrap; max-width: 44em; }
+.res-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-28); margin-top: var(--spacing-12); }
+.res-cols p { white-space: pre-wrap; font-size: var(--text-body-sm); color: #d6d6d6; margin-top: 6px; max-width: 34em; }
+.res-cols .none { color: var(--color-pewter); }
+.res-mark { margin-top: var(--spacing-12); display: flex; gap: var(--spacing-12); align-items: center; }
+.res-actions { margin-top: var(--spacing-48); display: flex; gap: var(--spacing-28); align-items: center; flex-wrap: wrap; }
+
+/* ============ Screens & transitions ============ */
+.screen[hidden] { display: none; }
+.screen { animation: rise .8s var(--ease-glide); }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+/* Busy state */
+.busy { display: flex; align-items: center; gap: var(--spacing-12); margin-top: var(--spacing-28); }
+.busy[hidden] { display: none; }
+.busy__dot { width: 10px; height: 10px; background: var(--color-paper); border-radius: 50%; animation: pulse 1s ease infinite alternate; }
+@keyframes pulse { from { opacity: .25; } to { opacity: 1; } }
+
+.footer { padding: var(--spacing-64) 0; }
+.footer p { font-size: 11px; line-height: 1.36; color: var(--color-ash-mist); margin-top: var(--spacing-8); }
+.footer a { color: var(--color-ash-mist); }
+
+/* ============ Responsive ============ */
+@media (max-width: 900px) {
+  .uploads { grid-template-columns: 1fr; }
+  .res-cols { grid-template-columns: 1fr; gap: var(--spacing-12); }
+}
+@media (max-width: 640px) {
+  .hero { min-height: 62vh; }
+  .badge { display: none; }
+  .top__nav { display: none; }
+  .pill { width: 100%; }
+  .quiz-controls .pill, .res-mark .pill, .upload-actions .pill { width: auto; flex: 1 1 auto; }
+  .lib-row__actions { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="container">
+    <a class="top__logo" href="./">Re-Wise</a>
+    <nav class="top__nav" aria-label="Site">
+      <a class="tlink" href="../">sites</a>
+      <a class="tlink" href="#library">Saved papers</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ HOME ============ -->
+  <section class="screen" id="screen-home">
+    <div class="hero" aria-label="Re-Wise">
+      <div class="hero__blob hero__blob--a"></div>
+      <div class="hero__blob hero__blob--b"></div>
+      <div class="hero__blob hero__blob--c"></div>
+      <div class="hero__veil"></div>
+      <div class="hero__inner">
+        <p class="label hero__eyebrow">Past paper + marking scheme &rarr; quiz</p>
+        <h1 class="hero__title">Re&#8209;Wise</h1>
+        <p class="hero__tail">Revise IGCSE past papers on any screen. Nothing leaves your device.</p>
+      </div>
+      <div class="badge" aria-hidden="true">
+        <svg viewBox="0 0 100 100">
+          <defs><path id="ring" d="M50,50 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0"/></defs>
+          <text><textPath href="#ring">RE-WISE &#183; PAST PAPERS &#183; NO PRINTING &#183;</textPath></text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="container">
+      <section class="section" id="upload" aria-labelledby="upload-h">
+        <p class="label label--muted section__label">01 &mdash; Upload</p>
+        <h2 class="whisper section__head" id="upload-h">Two PDFs in, one quiz out.</h2>
+
+        <div class="uploads">
+          <label class="dropzone" id="dz-paper">
+            <span class="label">Past paper (PDF)</span>
+            <input type="file" id="file-paper" accept="application/pdf,.pdf">
+            <span class="dropzone__name" id="name-paper">Tap to choose, or drop the file here</span>
+          </label>
+          <label class="dropzone is-optional" id="dz-scheme">
+            <span class="label">Marking scheme (PDF)</span>
+            <input type="file" id="file-scheme" accept="application/pdf,.pdf">
+            <span class="dropzone__name" id="name-scheme">Tap to choose, or drop the file here</span>
+          </label>
+        </div>
+        <p class="upload-note">Both files are read entirely in your browser — no uploads, no servers. Extraction is best-effort:
+          you will review and fix every question before the quiz starts. Without a marking scheme you can paste answers in by hand.</p>
+
+        <div class="upload-actions">
+          <button class="pill" id="btn-extract" disabled>Build the quiz</button>
+          <span class="label label--muted" id="extract-hint">Choose the past paper first</span>
+        </div>
+        <div class="busy" id="busy" hidden>
+          <span class="busy__dot"></span>
+          <span class="label" id="busy-text">Reading PDFs&hellip;</span>
+        </div>
+      </section>
+
+      <section class="section" id="library" aria-labelledby="library-h">
+        <p class="label label--muted section__label">02 &mdash; Saved papers</p>
+        <h2 class="whisper section__head" id="library-h">Retake without re-uploading.</h2>
+        <div class="rows" id="lib-rows"></div>
+        <p class="body-copy muted" id="lib-empty">Nothing saved yet. Papers you build appear here, stored only in this browser.</p>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============ REVIEW ============ -->
+  <section class="screen" id="screen-review" hidden>
+    <div class="container section">
+      <p class="label label--muted section__label">Review</p>
+      <h2 class="whisper section__head">Check the split before you start.</h2>
+      <p class="body-copy">Extraction is never perfect. Merge rows that belong together, split ones that don't,
+        and paste in any answer the matcher missed. Nothing starts until you say so.</p>
+
+      <div style="margin-top: var(--spacing-40); max-width: 560px;">
+        <label class="label label--muted" for="paper-title" style="display:block; margin-bottom:6px;">Paper title</label>
+        <input class="field field--title" id="paper-title" placeholder="e.g. Geography 0460/12 May 2024">
+      </div>
+
+      <div class="rows" id="rev-rows" style="margin-top: var(--spacing-40);"></div>
+      <button class="tlink rev-add" id="btn-add-q">+ Add question</button>
+
+      <details class="leftover" id="leftover-wrap" hidden>
+        <summary class="label label--muted">Unmatched marking-scheme text (copy from here)</summary>
+        <pre id="leftover"></pre>
+      </details>
+
+      <div class="rev-cta">
+        <button class="pill" id="btn-start">Start the quiz</button>
+        <button class="tlink tlink--muted" id="btn-save-later">Save for later</button>
+        <button class="tlink tlink--muted" id="btn-cancel-review">Discard</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="screen" id="screen-quiz" hidden>
+    <div class="container section">
+      <div class="quiz-top">
+        <span class="label" id="quiz-count">Question 01 / 12</span>
+        <button class="tlink tlink--muted" id="btn-quiz-exit">Save &amp; exit</button>
+      </div>
+      <div class="progress"><div class="progress__bar" id="quiz-bar"></div></div>
+
+      <p class="quiz-num" id="quiz-num" aria-hidden="true">01</p>
+      <p class="quiz-question" id="quiz-q"></p>
+
+      <div class="quiz-answer">
+        <label class="label label--muted" for="quiz-a">Your answer</label>
+        <textarea class="field" id="quiz-a" rows="4" placeholder="Type your answer (optional) — or just reveal and self-check"></textarea>
+      </div>
+
+      <div class="quiz-controls">
+        <button class="pill" id="btn-reveal" aria-expanded="false">Reveal answer</button>
+        <span class="spacer"></span>
+        <button class="pill" id="btn-prev">Previous</button>
+        <button class="pill" id="btn-next">Next question</button>
+      </div>
+
+      <div class="ms-block" id="ms-block" hidden aria-live="polite">
+        <span class="label">Marking scheme</span>
+        <p id="ms-text"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section class="screen" id="screen-results" hidden>
+    <div class="container section">
+      <p class="label label--muted section__label">Results</p>
+      <p class="score" id="score-line">0 / 0</p>
+      <p class="body-copy" id="score-sub">Mark each answer yourself against the scheme — the score updates as you go.</p>
+
+      <div class="rows" id="res-rows" style="margin-top: var(--spacing-48);"></div>
+
+      <div class="res-actions">
+        <button class="pill" id="btn-retake">Retake this paper</button>
+        <button class="tlink tlink--muted" id="btn-res-home">Back to papers</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p class="label label--muted">Re-Wise</p>
+    <p>A client-side study tool. PDFs are parsed with pdf.js in your browser; papers and progress live in this browser's storage only.</p>
+    <p><a href="../">Back to sites</a></p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+'use strict';
+/* ================================================================
+   Re-Wise — fully client-side past-paper quiz builder.
+   Storage: localStorage key "rewise.v1" = { papers: [...] }
+   ================================================================ */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  read() {
+    try { return JSON.parse(localStorage.getItem('rewise.v1')) || { papers: [] }; }
+    catch { return { papers: [] }; }
+  },
+  write(data) { localStorage.setItem('rewise.v1', JSON.stringify(data)); }
+};
+
+let state = {
+  draft: null,      // { title, items:[{q,a}], leftover }
+  paperId: null,    // active paper id on quiz/results screens
+  files: { paper: null, scheme: null }
+};
+
+/* ---------------- PDF text extraction ---------------- */
+async function extractLines(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    // Group items into lines by rounded Y, then order by X.
+    const byY = new Map();
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const y = Math.round(it.transform[5]);
+      let hit = null;
+      for (const key of byY.keys()) if (Math.abs(key - y) <= 2) { hit = key; break; }
+      const k = hit === null ? y : hit;
+      if (!byY.has(k)) byY.set(k, []);
+      byY.get(k).push({ x: it.transform[4], s: it.str });
+    }
+    const ys = [...byY.keys()].sort((a, b) => b - a); // top of page first
+    for (const y of ys) {
+      const parts = byY.get(y).sort((a, b) => a.x - b.x).map(o => o.s);
+      lines.push(parts.join(' ').replace(/\s+/g, ' ').trim());
+    }
+    lines.push(''); // page break
+  }
+  return lines;
+}
+
+/* Noise: headers, footers, dotted answer lines, copyright, barcodes */
+function cleanLines(lines) {
+  return lines.filter(l => {
+    if (!l) return false;
+    if (/^\.{3,}$/.test(l.replace(/\s/g, ''))) return false;              // dotted write-on lines
+    if (/^[._…\s]+$/.test(l)) return false;
+    if (/©|UCLES|Cambridge Assessment|\[Turn over\]?|DO NOT WRITE/i.test(l)) return false;
+    if (/^\*+[\d*]+\*+$/.test(l.replace(/\s/g, ''))) return false;        // barcode
+    if (/^(Page )?\d{1,3}$/i.test(l)) return false;                       // bare page number
+    if (/^BLANK PAGE$/i.test(l)) return false;
+    return true;
+  }).map(l => l.replace(/\.{4,}/g, ' ').replace(/\s+/g, ' ').trim());
+}
+
+/* Split running text into numbered top-level questions (1..n in order). */
+function splitByNumbers(lines) {
+  const chunks = [];   // {num, text[]}
+  let current = null;
+  let expected = 1;
+  for (const line of lines) {
+    const m = line.match(/^(\d{1,2})[\s.().]/) || line.match(/^(\d{1,2})$/);
+    const n = m ? parseInt(m[1], 10) : null;
+    // Accept as a new question only if it continues the sequence (tolerate one gap).
+    if (n !== null && (n === expected || n === expected + 1) && n <= 60) {
+      current = { num: n, text: [line.replace(/^(\d{1,2})[\s.]?/, '').trim()] };
+      chunks.push(current);
+      expected = n + 1;
+    } else if (current) {
+      current.text.push(line);
+    }
+  }
+  return chunks.map(c => ({ num: c.num, text: c.text.join('\n').trim() }));
+}
+
+/* Mark schemes often read "Question | Answer | Marks" — same numeric split works as best effort. */
+function parseScheme(lines) {
+  const startIdx = lines.findIndex(l => /answer/i.test(l) && /mark/i.test(l));
+  const body = startIdx >= 0 ? lines.slice(startIdx + 1) : lines;
+  const chunks = splitByNumbers(body);
+  const map = new Map();
+  for (const c of chunks) map.set(c.num, c.text);
+  return { map, raw: body.join('\n') };
+}
+
+async function buildDraft() {
+  const btn = $('btn-extract');
+  btn.disabled = true;
+  $('busy').hidden = false;
+  try {
+    $('busy-text').textContent = 'Reading the past paper…';
+    const paperLines = cleanLines(await extractLines(state.files.paper));
+    let schemeMap = new Map(), schemeRaw = '';
+    if (state.files.scheme) {
+      $('busy-text').textContent = 'Reading the marking scheme…';
+      const schemeLines = cleanLines(await extractLines(state.files.scheme));
+      const parsed = parseScheme(schemeLines);
+      schemeMap = parsed.map; schemeRaw = parsed.raw;
+    }
+    const qs = splitByNumbers(paperLines);
+    const items = (qs.length ? qs : [{ num: 1, text: paperLines.join('\n') }])
+      .map(c => ({ q: c.text, a: schemeMap.get(c.num) || '' }));
+    const matched = items.filter(i => i.a).length;
+    state.draft = {
+      title: (state.files.paper.name || 'Past paper').replace(/\.pdf$/i, ''),
+      items, leftover: schemeRaw
+    };
+    renderReview();
+    show('screen-review');
+    window.scrollTo({ top: 0 });
+    if (!qs.length) alert('Could not detect numbered questions — everything landed in one block. Use Split to break it up.');
+    else if (state.files.scheme && matched < items.length)
+      console.info(`Re-Wise: matched ${matched}/${items.length} answers`);
+  } catch (err) {
+    alert('Could not read that PDF: ' + (err && err.message ? err.message : err));
+  } finally {
+    $('busy').hidden = true;
+    btn.disabled = !(state.files.paper);
+  }
+}
+
+/* ---------------- Review screen ---------------- */
+function renderReview() {
+  $('paper-title').value = state.draft.title;
+  const wrap = $('rev-rows');
+  wrap.innerHTML = '';
+  state.draft.items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'row rev-item';
+    row.innerHTML = `
+      <div class="rev-item__head">
+        <span class="rev-item__num">${String(i + 1).padStart(2, '0')}</span>
+        <span class="rev-item__ops">
+          <button class="tlink tlink--muted" data-op="merge" data-i="${i}" ${i === 0 ? 'disabled' : ''}>Merge &uarr;</button>
+          <button class="tlink tlink--muted" data-op="split" data-i="${i}">Split at cursor</button>
+          <button class="tlink tlink--muted" data-op="del" data-i="${i}">Delete</button>
+        </span>
+      </div>
+      <label class="label label--muted" for="q-${i}">Question</label>
+      <textarea class="field" id="q-${i}" data-part="q" data-i="${i}" rows="4"></textarea>
+      <label class="label label--muted" for="a-${i}">Answer (marking scheme)</label>
+      <textarea class="field ${item.a ? '' : 'field--quiet'}" id="a-${i}" data-part="a" data-i="${i}" rows="3"
+        placeholder="No match found — paste the answer here"></textarea>`;
+    row.querySelector(`#q-${i}`).value = item.q;
+    row.querySelector(`#a-${i}`).value = item.a;
+    wrap.appendChild(row);
+  });
+  $('leftover-wrap').hidden = !state.draft.leftover;
+  $('leftover').textContent = state.draft.leftover || '';
+}
+
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.dataset && t.dataset.part && state.draft) {
+    state.draft.items[+t.dataset.i][t.dataset.part] = t.value;
+  }
+});
+
+$('rev-rows').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-op]');
+  if (!btn || !state.draft) return;
+  const i = +btn.dataset.i;
+  const items = state.draft.items;
+  if (btn.dataset.op === 'del') {
+    items.splice(i, 1);
+  } else if (btn.dataset.op === 'merge' && i > 0) {
+    items[i - 1].q = (items[i - 1].q + '\n' + items[i].q).trim();
+    items[i - 1].a = (items[i - 1].a + '\n' + items[i].a).trim();
+    items.splice(i, 1);
+  } else if (btn.dataset.op === 'split') {
+    const ta = $(`q-${i}`);
+    const pos = ta.selectionStart;
+    if (!pos || pos >= ta.value.length) {
+      alert('Place the cursor inside the question text where the split should happen, then press Split.');
+      return;
+    }
+    const head = ta.value.slice(0, pos).trim();
+    const tail = ta.value.slice(pos).trim();
+    items[i].q = head;
+    items.splice(i + 1, 0, { q: tail, a: '' });
+  }
+  renderReview();
+});
+
+$('btn-add-q').addEventListener('click', () => {
+  if (!state.draft) return;
+  state.draft.items.push({ q: '', a: '' });
+  renderReview();
+  const last = state.draft.items.length - 1;
+  $(`q-${last}`).focus();
+});
+
+function saveDraftAsPaper() {
+  const items = state.draft.items.filter(it => it.q.trim());
+  if (!items.length) { alert('There are no questions to save.'); return null; }
+  const data = store.read();
+  const paper = {
+    id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title: ($('paper-title').value.trim() || 'Untitled paper'),
+    created: Date.now(),
+    questions: items.map(it => ({ q: it.q.trim(), a: it.a.trim() })),
+    attempt: null
+  };
+  data.papers.unshift(paper);
+  store.write(data);
+  state.draft = null;
+  return paper;
+}
+
+$('btn-start').addEventListener('click', () => {
+  const paper = saveDraftAsPaper();
+  if (paper) startQuiz(paper.id);
+});
+$('btn-save-later').addEventListener('click', () => {
+  if (saveDraftAsPaper()) { renderLibrary(); show('screen-home'); window.scrollTo({ top: 0 }); }
+});
+$('btn-cancel-review').addEventListener('click', () => {
+  if (confirm('Discard this extraction?')) { state.draft = null; show('screen-home'); }
+});
+
+/* ---------------- Library ---------------- */
+function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function renderLibrary() {
+  const data = store.read();
+  const wrap = $('lib-rows');
+  wrap.innerHTML = '';
+  $('lib-empty').hidden = data.papers.length > 0;
+  for (const p of data.papers) {
+    const att = p.attempt;
+    let status = `${p.questions.length} questions`;
+    if (att && att.finished) {
+      const marked = att.marks.filter(m => m === 1).length;
+      status += ` · last score ${marked} / ${p.questions.length}`;
+    } else if (att) {
+      status += ` · in progress (${Math.min(att.index + 1, p.questions.length)} / ${p.questions.length})`;
+    }
+    const row = document.createElement('div');
+    row.className = 'row lib-row';
+    row.innerHTML = `
+      <div>
+        <p class="lib-row__title"></p>
+        <p class="lib-row__meta">${fmtDate(p.created)} · ${status}</p>
+      </div>
+      <div class="lib-row__actions">
+        <button class="tlink" data-act="open" data-id="${p.id}">${att && !att.finished ? 'Continue' : 'Retake'}</button>
+        ${att && att.finished ? `<button class="tlink tlink--muted" data-act="results" data-id="${p.id}">Results</button>` : ''}
+        <button class="tlink tlink--muted" data-act="del" data-id="${p.id}">Delete</button>
+      </div>`;
+    row.querySelector('.lib-row__title').textContent = p.title;
+    wrap.appendChild(row);
+  }
+}
+$('lib-rows').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.act === 'del') {
+    if (!confirm('Delete this paper and its progress from this browser?')) return;
+    const data = store.read();
+    data.papers = data.papers.filter(p => p.id !== id);
+    store.write(data);
+    renderLibrary();
+  } else if (btn.dataset.act === 'results') {
+    state.paperId = id; renderResults(); show('screen-results'); window.scrollTo({ top: 0 });
+  } else {
+    const data = store.read();
+    const p = data.papers.find(x => x.id === id);
+    if (p && p.attempt && p.attempt.finished) { p.attempt = null; store.write(data); }
+    startQuiz(id);
+  }
+});
+
+/* ---------------- Quiz ---------------- */
+function getPaper() {
+  return store.read().papers.find(p => p.id === state.paperId) || null;
+}
+function patchPaper(fn) {
+  const data = store.read();
+  const p = data.papers.find(x => x.id === state.paperId);
+  if (!p) return null;
+  fn(p);
+  store.write(data);
+  return p;
+}
+
+function startQuiz(id) {
+  state.paperId = id;
+  const p = patchPaper(p => {
+    if (!p.attempt) p.attempt = {
+      index: 0,
+      answers: Array(p.questions.length).fill(''),
+      revealed: Array(p.questions.length).fill(false),
+      marks: Array(p.questions.length).fill(null),
+      finished: false, updated: Date.now()
+    };
+  });
+  if (!p) return;
+  show('screen-quiz');
+  renderQuiz();
+  window.scrollTo({ top: 0 });
+}
+
+function renderQuiz() {
+  const p = getPaper();
+  if (!p || !p.attempt) return;
+  const i = p.attempt.index, n = p.questions.length;
+  const num = String(i + 1).padStart(2, '0');
+  $('quiz-count').textContent = `Question ${num} / ${String(n).padStart(2, '0')}`;
+  $('quiz-bar').style.width = `${((i + 1) / n) * 100}%`;
+  $('quiz-num').textContent = num;
+  $('quiz-q').textContent = p.questions[i].q;
+  $('quiz-a').value = p.attempt.answers[i] || '';
+  const revealed = p.attempt.revealed[i];
+  $('ms-block').hidden = !revealed;
+  $('ms-text').textContent = revealed
+    ? (p.questions[i].a || 'No answer was provided for this question.') : '';
+  $('btn-reveal').setAttribute('aria-expanded', String(revealed));
+  $('btn-reveal').textContent = revealed ? 'Hide answer' : 'Reveal answer';
+  $('btn-prev').disabled = i === 0;
+  $('btn-next').textContent = i === n - 1 ? 'Finish paper' : 'Next question';
+}
+
+$('quiz-a').addEventListener('input', () => {
+  patchPaper(p => { p.attempt.answers[p.attempt.index] = $('quiz-a').value; p.attempt.updated = Date.now(); });
+});
+$('btn-reveal').addEventListener('click', () => {
+  patchPaper(p => { p.attempt.revealed[p.attempt.index] = !p.attempt.revealed[p.attempt.index]; });
+  renderQuiz();
+});
+$('btn-prev').addEventListener('click', () => {
+  patchPaper(p => { p.attempt.index = Math.max(0, p.attempt.index - 1); });
+  renderQuiz();
+});
+$('btn-next').addEventListener('click', () => {
+  const p = getPaper();
+  if (!p) return;
+  if (p.attempt.index >= p.questions.length - 1) {
+    patchPaper(x => { x.attempt.finished = true; });
+    renderResults(); show('screen-results'); window.scrollTo({ top: 0 });
+  } else {
+    patchPaper(x => { x.attempt.index += 1; });
+    renderQuiz(); window.scrollTo({ top: 0 });
+  }
+});
+$('btn-quiz-exit').addEventListener('click', () => {
+  renderLibrary(); show('screen-home'); window.scrollTo({ top: 0 });
+});
+
+/* ---------------- Results & self-marking ---------------- */
+function renderResults() {
+  const p = getPaper();
+  if (!p || !p.attempt) return;
+  const wrap = $('res-rows');
+  wrap.innerHTML = '';
+  p.questions.forEach((q, i) => {
+    const yours = (p.attempt.answers[i] || '').trim();
+    const mark = p.attempt.marks[i];
+    const row = document.createElement('div');
+    row.className = 'row row--quiet';
+    row.innerHTML = `
+      <p class="label label--muted">Question ${String(i + 1).padStart(2, '0')}</p>
+      <p class="res-row__q"></p>
+      <div class="res-cols">
+        <div><span class="label label--muted">Your answer</span><p class="${yours ? '' : 'none'}"></p></div>
+        <div><span class="label label--muted">Marking scheme</span><p class="${q.a ? '' : 'none'}"></p></div>
+      </div>
+      <div class="res-mark" role="group" aria-label="Self-mark question ${i + 1}">
+        <button class="pill pill--sm ${mark === 1 ? 'pill--on' : ''}" data-mark="1" data-i="${i}" aria-pressed="${mark === 1}">Correct</button>
+        <button class="pill pill--sm ${mark === 0 ? 'pill--on' : ''}" data-mark="0" data-i="${i}" aria-pressed="${mark === 0}">Wrong</button>
+      </div>`;
+    row.querySelector('.res-row__q').textContent = q.q;
+    const cols = row.querySelectorAll('.res-cols p');
+    cols[0].textContent = yours || 'Not attempted';
+    cols[1].textContent = q.a || 'No answer provided';
+    wrap.appendChild(row);
+  });
+  updateScore();
+}
+function updateScore() {
+  const p = getPaper();
+  if (!p || !p.attempt) return;
+  const marked = p.attempt.marks.filter(m => m === 1).length;
+  $('score-line').textContent = `${marked} / ${p.questions.length}`;
+  const attempted = p.attempt.answers.filter(a => (a || '').trim()).length;
+  $('score-sub').textContent =
+    `You attempted ${attempted} of ${p.questions.length}. Mark each answer against the scheme — the score updates as you go.`;
+}
+$('res-rows').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mark]');
+  if (!btn) return;
+  const i = +btn.dataset.i, val = +btn.dataset.mark;
+  patchPaper(p => { p.attempt.marks[i] = p.attempt.marks[i] === val ? null : val; });
+  renderResults();
+});
+$('btn-retake').addEventListener('click', () => {
+  patchPaper(p => { p.attempt = null; });
+  startQuiz(state.paperId);
+});
+$('btn-res-home').addEventListener('click', () => {
+  renderLibrary(); show('screen-home'); window.scrollTo({ top: 0 });
+});
+
+/* ---------------- Upload wiring ---------------- */
+function wireDropzone(zoneId, inputId, nameId, key) {
+  const zone = $(zoneId), input = $(inputId), name = $(nameId);
+  const setFile = (file) => {
+    if (!file) return;
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      alert('Only PDF files are supported.'); return;
+    }
+    state.files[key] = file;
+    name.textContent = file.name;
+    name.classList.add('is-set');
+    $('btn-extract').disabled = !state.files.paper;
+    $('extract-hint').textContent = state.files.paper
+      ? (state.files.scheme ? 'Ready' : 'No scheme — you can paste answers during review')
+      : 'Choose the past paper first';
+  };
+  input.addEventListener('change', () => setFile(input.files[0]));
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('is-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('is-over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault(); zone.classList.remove('is-over');
+    setFile(e.dataTransfer.files[0]);
+  });
+}
+wireDropzone('dz-paper', 'file-paper', 'name-paper', 'paper');
+wireDropzone('dz-scheme', 'file-scheme', 'name-scheme', 'scheme');
+$('btn-extract').addEventListener('click', buildDraft);
+
+/* ---------------- Screen switching ---------------- */
+function show(id) {
+  for (const s of document.querySelectorAll('.screen')) s.hidden = (s.id !== id);
+}
+
+renderLibrary();
+</script>
+</body>
+</html>

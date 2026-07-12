@@ -1,1 +1,45 @@
-<h1>Привет, мир!</h1>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>sites</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  color: #fff; background: #000;
+  max-width: 1078px; margin: 0 auto; padding: 68px 24px;
+}
+h1 { font-size: clamp(40px, 8vw, 78px); font-weight: 300; line-height: 1.1; }
+p.note { margin-top: 12px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9a9a9a; }
+ul { list-style: none; margin-top: 46px; border-top: 1px solid #fff; }
+li { border-bottom: 1px solid #fff; }
+li a {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+  padding: 28px 0; color: #fff; text-decoration: none;
+  transition: letter-spacing .8s cubic-bezier(0.19, 1, 0.22, 1);
+}
+li a:hover { letter-spacing: .02em; }
+li a .name { font-size: 18px; font-weight: 400; }
+li a .desc { font-size: 12px; color: #9a9a9a; text-align: right; }
+:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<h1>sites</h1>
+<p class="note">Small tools &amp; experiments</p>
+<ul>
+  <li>
+    <a href="re-wise/">
+      <span class="name">Re-Wise</span>
+      <span class="desc">Turn IGCSE past papers into interactive quizzes</span>
+    </a>
+  </li>
+</ul>
+</body>
+</html>
