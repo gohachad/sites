@@ -63,7 +63,9 @@ body {
   background: var(--color-obsidian);
   -webkit-font-smoothing: antialiased;
 }
-.container { max-width: var(--page-max-width); margin: 0 auto; padding: 0 24px; }
+/* Fullscreen layout: the page spans the whole viewport; text blocks keep
+   their own max-widths for readable line lengths. */
+.container { width: 100%; margin: 0 auto; padding: 0 clamp(24px, 4vw, 64px); }
 :focus-visible { outline: 2px solid var(--color-paper); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -133,7 +135,8 @@ body {
   position: relative; overflow: hidden;
   background: var(--color-obsidian);
   color: var(--color-paper);
-  min-height: 72vh;
+  min-height: 100vh;
+  min-height: 100svh;
   display: flex; align-items: center; justify-content: center;
   text-align: center;
 }
@@ -212,6 +215,24 @@ textarea.field { resize: vertical; min-height: 84px; }
 .field--title { font-size: var(--text-body); padding: 14px; }
 .field--quiet { border-color: var(--color-pewter); }
 
+/* ============ Figures (diagrams cut from the PDF) ============ */
+.fig { margin-top: var(--spacing-28); }
+.fig img {
+  display: block; max-width: 100%; height: auto; max-height: 560px;
+  object-fit: contain; object-position: left top;
+  background: var(--color-paper);
+  border: 1px solid #2e2e2e;
+}
+.fig figcaption { margin-top: var(--spacing-8); }
+.fig--thumb img { max-width: 340px; max-height: 260px; }
+
+/* ============ MCQ choices ============ */
+.choices { display: flex; gap: var(--element-gap); margin-top: var(--spacing-12); flex-wrap: wrap; }
+.choice {
+  width: 64px; min-height: 48px; padding: 11px 0;
+  font-size: var(--text-body);
+}
+
 /* ============ Review ============ */
 .rev-item__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--element-gap); margin-bottom: var(--spacing-12); flex-wrap: wrap; }
 .rev-item__num { font-size: var(--text-subheading); font-weight: var(--font-weight-light); line-height: 1; }
@@ -241,6 +262,9 @@ details.leftover pre {
 .quiz-question { font-size: clamp(18px, 2.2vw, 22px); line-height: 1.5; font-weight: var(--font-weight-regular); max-width: 42em; white-space: pre-wrap; }
 .quiz-answer { margin-top: var(--spacing-40); }
 .quiz-answer label { display: block; margin-bottom: var(--spacing-8); }
+.quiz-answer[hidden] { display: none; }
+.quiz-mcq { margin-top: var(--spacing-40); }
+.quiz-mcq[hidden] { display: none; }
 .quiz-controls { margin-top: var(--spacing-28); display: flex; gap: var(--element-gap); align-items: center; flex-wrap: wrap; }
 .quiz-controls .spacer { flex: 1; }
 .ms-block { margin-top: var(--spacing-40); border-top: 1px solid var(--color-paper); padding-top: var(--spacing-28); }
@@ -282,11 +306,11 @@ details.leftover pre {
   .res-cols { grid-template-columns: 1fr; gap: var(--spacing-12); }
 }
 @media (max-width: 640px) {
-  .hero { min-height: 62vh; }
   .badge { display: none; }
   .top__nav { display: none; }
   .pill { width: 100%; }
   .quiz-controls .pill, .res-mark .pill, .upload-actions .pill { width: auto; flex: 1 1 auto; }
+  .choices .choice { width: auto; flex: 1 1 0; }
   .lib-row__actions { width: 100%; }
 }
 </style>
@@ -327,7 +351,7 @@ details.leftover pre {
     <div class="container">
       <section class="section" id="upload" aria-labelledby="upload-h">
         <p class="label label--muted section__label">01 &mdash; Upload</p>
-        <h2 class="whisper section__head" id="upload-h">Two PDFs in, one quiz out.</h2>
+        <h2 class="whisper section__head" id="upload-h">Two PDFs in, straight into the quiz.</h2>
 
         <div class="uploads">
           <label class="dropzone" id="dz-paper">
@@ -341,11 +365,13 @@ details.leftover pre {
             <span class="dropzone__name" id="name-scheme">Tap to choose, or drop the file here</span>
           </label>
         </div>
-        <p class="upload-note">Both files are read entirely in your browser — no uploads, no servers. Extraction is best-effort:
-          you will review and fix every question before the quiz starts. Without a marking scheme you can paste answers in by hand.</p>
+        <p class="upload-note">Both files are read entirely in your browser — no uploads, no servers.
+          The quiz starts right away; if the automatic split ever gets something wrong,
+          use <strong>Edit</strong> next to the saved paper to fix questions or answers.
+          Diagrams are kept as images. Multiple-choice papers get A&ndash;D answer buttons.</p>
 
         <div class="upload-actions">
-          <button class="pill" id="btn-extract" disabled>Build the quiz</button>
+          <button class="pill" id="btn-extract" disabled>Start the quiz</button>
           <span class="label label--muted" id="extract-hint">Choose the past paper first</span>
         </div>
         <div class="busy" id="busy" hidden>
@@ -363,13 +389,13 @@ details.leftover pre {
     </div>
   </section>
 
-  <!-- ============ REVIEW ============ -->
+  <!-- ============ REVIEW / EDIT (reached from the library, not part of the main flow) ============ -->
   <section class="screen" id="screen-review" hidden>
     <div class="container section">
-      <p class="label label--muted section__label">Review</p>
-      <h2 class="whisper section__head">Check the split before you start.</h2>
-      <p class="body-copy">Extraction is never perfect. Merge rows that belong together, split ones that don't,
-        and paste in any answer the matcher missed. Nothing starts until you say so.</p>
+      <p class="label label--muted section__label">Edit</p>
+      <h2 class="whisper section__head">Fix the split, then carry on.</h2>
+      <p class="body-copy">Merge rows that belong together, split ones that don't, or paste in a missed answer.
+        Saving resets any attempt in progress for this paper.</p>
 
       <div style="margin-top: var(--spacing-40); max-width: 560px;">
         <label class="label label--muted" for="paper-title" style="display:block; margin-bottom:6px;">Paper title</label>
@@ -379,15 +405,10 @@ details.leftover pre {
       <div class="rows" id="rev-rows" style="margin-top: var(--spacing-40);"></div>
       <button class="tlink rev-add" id="btn-add-q">+ Add question</button>
 
-      <details class="leftover" id="leftover-wrap" hidden>
-        <summary class="label label--muted">Unmatched marking-scheme text (copy from here)</summary>
-        <pre id="leftover"></pre>
-      </details>
-
       <div class="rev-cta">
-        <button class="pill" id="btn-start">Start the quiz</button>
-        <button class="tlink tlink--muted" id="btn-save-later">Save for later</button>
-        <button class="tlink tlink--muted" id="btn-cancel-review">Discard</button>
+        <button class="pill" id="btn-save-start">Save &amp; start quiz</button>
+        <button class="tlink tlink--muted" id="btn-save-back">Save &amp; back to papers</button>
+        <button class="tlink tlink--muted" id="btn-cancel-review">Cancel</button>
       </div>
     </div>
   </section>
@@ -404,7 +425,17 @@ details.leftover pre {
       <p class="quiz-num" id="quiz-num" aria-hidden="true">01</p>
       <p class="quiz-question" id="quiz-q"></p>
 
-      <div class="quiz-answer">
+      <figure class="fig" id="quiz-fig" hidden>
+        <img id="quiz-fig-img" alt="Diagram from the paper">
+        <figcaption class="label label--muted">From the paper</figcaption>
+      </figure>
+
+      <div class="quiz-mcq" id="quiz-mcq" hidden>
+        <span class="label label--muted">Your answer</span>
+        <div class="choices" id="quiz-choices" role="group" aria-label="Answer choices"></div>
+      </div>
+
+      <div class="quiz-answer" id="quiz-answer-wrap">
         <label class="label label--muted" for="quiz-a">Your answer</label>
         <textarea class="field" id="quiz-a" rows="4" placeholder="Type your answer (optional) — or just reveal and self-check"></textarea>
       </div>
@@ -428,7 +459,7 @@ details.leftover pre {
     <div class="container section">
       <p class="label label--muted section__label">Results</p>
       <p class="score" id="score-line">0 / 0</p>
-      <p class="body-copy" id="score-sub">Mark each answer yourself against the scheme — the score updates as you go.</p>
+      <p class="body-copy" id="score-sub">Multiple-choice answers are checked automatically; mark the rest yourself.</p>
 
       <div class="rows" id="res-rows" style="margin-top: var(--spacing-48);"></div>
 
@@ -443,7 +474,7 @@ details.leftover pre {
 <footer class="footer">
   <div class="container">
     <p class="label label--muted">Re-Wise</p>
-    <p>A client-side study tool. PDFs are parsed with pdf.js in your browser; papers and progress live in this browser's storage only.</p>
+    <p>A client-side study tool. PDFs are parsed with pdf.js in your browser; papers, diagrams and progress live in this browser's storage only.</p>
     <p><a href="../">Back to sites</a></p>
   </div>
 </footer>
@@ -454,6 +485,7 @@ details.leftover pre {
 /* ================================================================
    Re-Wise — fully client-side past-paper quiz builder.
    Storage: localStorage key "rewise.v1" = { papers: [...] }
+   Question item: { q, a, img?, mcq?: ["A","B","C","D"] }
    ================================================================ */
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -469,20 +501,37 @@ const store = {
 };
 
 let state = {
-  draft: null,      // { title, items:[{q,a}], leftover }
-  paperId: null,    // active paper id on quiz/results screens
+  draft: null,        // { title, items:[...] } while editing
+  editPaperId: null,  // paper being edited on the review screen
+  paperId: null,      // active paper on quiz/results screens
   files: { paper: null, scheme: null }
 };
 
-/* ---------------- PDF text extraction ---------------- */
-async function extractLines(file) {
+/* ---------------- PDF text extraction (per page, with y positions) ---------------- */
+const NOISE = [
+  /©|UCLES|Cambridge Assessment|\[Turn over\]?|DO NOT WRITE/i,
+  /^BLANK PAGE$/i
+];
+function isNoise(text) {
+  if (!text) return true;
+  const bare = text.replace(/\s/g, '');
+  if (/^\.{3,}$/.test(bare) || /^[._…]+$/.test(bare)) return true;   // dotted write-on lines
+  if (/^\*+[\d*]+\*+$/.test(bare)) return true;                       // barcode
+  if (/^(Page )?\d{1,3}$/i.test(text)) return true;                   // bare page number
+  return NOISE.some(re => re.test(text));
+}
+
+async function extractPages(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const lines = [];
+  const pages = [];
+  const imgOps = new Set([
+    pdfjsLib.OPS.paintImageXObject, pdfjsLib.OPS.paintInlineImageXObject,
+    pdfjsLib.OPS.paintImageMaskXObject, pdfjsLib.OPS.paintImageXObjectRepeat
+  ]);
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const tc = await page.getTextContent();
-    // Group items into lines by rounded Y, then order by X.
     const byY = new Map();
     for (const it of tc.items) {
       if (!it.str || !it.str.trim()) continue;
@@ -493,88 +542,193 @@ async function extractLines(file) {
       if (!byY.has(k)) byY.set(k, []);
       byY.get(k).push({ x: it.transform[4], s: it.str });
     }
-    const ys = [...byY.keys()].sort((a, b) => b - a); // top of page first
-    for (const y of ys) {
-      const parts = byY.get(y).sort((a, b) => a.x - b.x).map(o => o.s);
-      lines.push(parts.join(' ').replace(/\s+/g, ' ').trim());
+    const lines = [];
+    for (const y of [...byY.keys()].sort((a, b) => b - a)) {
+      const text = byY.get(y).sort((a, b) => a.x - b.x).map(o => o.s)
+        .join(' ').replace(/\.{4,}/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!isNoise(text)) lines.push({ y, text });
     }
-    lines.push(''); // page break
+    let hasImages = false;
+    try {
+      const ops = await page.getOperatorList();
+      hasImages = ops.fnArray.some(fn => imgOps.has(fn));
+    } catch { /* keep false */ }
+    pages.push({ index: p - 1, lines, hasImages });
   }
-  return lines;
+  return { pdf, pages };
 }
 
-/* Noise: headers, footers, dotted answer lines, copyright, barcodes */
-function cleanLines(lines) {
-  return lines.filter(l => {
-    if (!l) return false;
-    if (/^\.{3,}$/.test(l.replace(/\s/g, ''))) return false;              // dotted write-on lines
-    if (/^[._…\s]+$/.test(l)) return false;
-    if (/©|UCLES|Cambridge Assessment|\[Turn over\]?|DO NOT WRITE/i.test(l)) return false;
-    if (/^\*+[\d*]+\*+$/.test(l.replace(/\s/g, ''))) return false;        // barcode
-    if (/^(Page )?\d{1,3}$/i.test(l)) return false;                       // bare page number
-    if (/^BLANK PAGE$/i.test(l)) return false;
-    return true;
-  }).map(l => l.replace(/\.{4,}/g, ' ').replace(/\s+/g, ' ').trim());
+/* ---------------- Question split ---------------- */
+function numberOf(text) {
+  const m = text.match(/^(\d{1,2})[\s.().]/) || text.match(/^(\d{1,2})$/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
-/* Split running text into numbered top-level questions (1..n in order). */
-function splitByNumbers(lines) {
-  const chunks = [];   // {num, text[]}
+/* Split page lines into numbered top-level questions (1..n, tolerate one gap). */
+function parseQuestions(pages) {
+  const items = [];
   let current = null;
   let expected = 1;
-  for (const line of lines) {
-    const m = line.match(/^(\d{1,2})[\s.().]/) || line.match(/^(\d{1,2})$/);
-    const n = m ? parseInt(m[1], 10) : null;
-    // Accept as a new question only if it continues the sequence (tolerate one gap).
-    if (n !== null && (n === expected || n === expected + 1) && n <= 60) {
-      current = { num: n, text: [line.replace(/^(\d{1,2})[\s.]?/, '').trim()] };
-      chunks.push(current);
-      expected = n + 1;
-    } else if (current) {
-      current.text.push(line);
+  for (const page of pages) {
+    for (const line of page.lines) {
+      const n = numberOf(line.text);
+      if (n !== null && (n === expected || n === expected + 1) && n <= 60) {
+        current = {
+          num: n, page: page.index, yTop: line.y,
+          lines: [{ page: page.index, y: line.y, text: line.text.replace(/^(\d{1,2})[\s.]?/, '').trim() }]
+        };
+        items.push(current);
+        expected = n + 1;
+      } else if (current) {
+        current.lines.push({ page: page.index, y: line.y, text: line.text });
+      }
     }
   }
-  return chunks.map(c => ({ num: c.num, text: c.text.join('\n').trim() }));
+  return items;
 }
 
-/* Mark schemes often read "Question | Answer | Marks" — same numeric split works as best effort. */
-function parseScheme(lines) {
-  const startIdx = lines.findIndex(l => /answer/i.test(l) && /mark/i.test(l));
-  const body = startIdx >= 0 ? lines.slice(startIdx + 1) : lines;
-  const chunks = splitByNumbers(body);
+/* Detect a multiple-choice item: lines starting with A/B/C/D (3+ distinct letters). */
+function detectMcq(text) {
+  const letters = new Set();
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\(?([A-E])[\s.).]/);
+    if (m) letters.add(m[1]);
+  }
+  if (letters.size >= 3 && letters.has('A') && letters.has('B')) {
+    return [...letters].sort();
+  }
+  return null;
+}
+
+/* ---------------- Diagram capture ---------------- */
+/* A question region likely holds a diagram when there is a large vertical gap
+   between its text lines (or before the next question), or the page carries
+   raster images. Gap thresholds are in PDF points. */
+function needsImage(item, nextItem, page) {
+  const onPage = item.lines.filter(l => l.page === item.page);
+  const yEnd = (nextItem && nextItem.page === item.page) ? nextItem.yTop + 14 : 40;
+  const regionH = item.yTop - yEnd;
+  if (regionH < 80) return null;
+  const ys = onPage.map(l => l.y).sort((a, b) => b - a);
+  // Count the gap down to the next question only when it exists on the same
+  // page; the run-out to the bottom of the last page is usually just blank.
+  if (nextItem && nextItem.page === item.page) ys.push(yEnd);
+  let maxGap = 0;
+  for (let k = 0; k < ys.length - 1; k++) maxGap = Math.max(maxGap, ys[k] - ys[k + 1]);
+  if (maxGap > 110 || (page.hasImages && maxGap > 60)) {
+    return { yTop: Math.min(item.yTop + 16, 830), yEnd: Math.max(yEnd, 30) };
+  }
+  return null;
+}
+
+async function renderRegion(pdf, pageIndex, yTopPdf, yEndPdf) {
+  const page = await pdf.getPage(pageIndex + 1);
+  const scale = 1.5;
+  const vp = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(vp.width);
+  canvas.height = Math.ceil(vp.height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+  const [, top] = vp.convertToViewportPoint(0, yTopPdf);
+  const [, bottom] = vp.convertToViewportPoint(0, yEndPdf);
+  const y0 = Math.max(0, Math.floor(top));
+  const h = Math.min(canvas.height - y0, Math.ceil(bottom - top));
+  if (h <= 12) return null;
+
+  const cut = document.createElement('canvas');
+  cut.width = canvas.width;
+  cut.height = h;
+  cut.getContext('2d').drawImage(canvas, 0, y0, canvas.width, h, 0, 0, canvas.width, h);
+  return cut.toDataURL('image/jpeg', 0.72);
+}
+
+/* ---------------- Mark scheme parsing ---------------- */
+/* "Question | Answer | Marks" tables: split by the same numbering, then
+   strip the trailing marks digit and reduce MCQ answers to the bare letter. */
+function parseScheme(pages) {
+  const flat = pages.flatMap(p => p.lines.map(l => l.text));
+  const startIdx = flat.findIndex(l => /answer/i.test(l) && /mark/i.test(l));
+  const body = startIdx >= 0 ? flat.slice(startIdx + 1) : flat;
   const map = new Map();
-  for (const c of chunks) map.set(c.num, c.text);
-  return { map, raw: body.join('\n') };
+  let current = null, expected = 1;
+  for (const line of body) {
+    const n = numberOf(line);
+    if (n !== null && (n === expected || n === expected + 1) && n <= 60) {
+      current = { num: n, lines: [line.replace(/^(\d{1,2})[\s.]?/, '').trim()] };
+      map.set(n, current);
+      expected = n + 1;
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+  const out = new Map();
+  for (const [n, c] of map) {
+    // The marks column tends to land at the end of the first line: "longshore drift 1"
+    if (c.lines[0]) c.lines[0] = c.lines[0].replace(/\s+\d{1,2}$/, '').trim();
+    out.set(n, c.lines.filter(Boolean).join('\n').trim());
+  }
+  return { map: out, raw: body.join('\n') };
 }
 
-async function buildDraft() {
+function mcqLetterFrom(answerText) {
+  if (!answerText) return null;
+  const m = answerText.trim().match(/(?:^|[\s(])([A-E])(?=[\s).]|$)/);
+  return m ? m[1] : null;
+}
+
+/* ---------------- Build & go straight to the quiz ---------------- */
+async function buildAndStart() {
   const btn = $('btn-extract');
   btn.disabled = true;
   $('busy').hidden = false;
   try {
     $('busy-text').textContent = 'Reading the past paper…';
-    const paperLines = cleanLines(await extractLines(state.files.paper));
-    let schemeMap = new Map(), schemeRaw = '';
+    const paper = await extractPages(state.files.paper);
+    let schemeMap = new Map();
     if (state.files.scheme) {
       $('busy-text').textContent = 'Reading the marking scheme…';
-      const schemeLines = cleanLines(await extractLines(state.files.scheme));
-      const parsed = parseScheme(schemeLines);
-      schemeMap = parsed.map; schemeRaw = parsed.raw;
+      const scheme = await extractPages(state.files.scheme);
+      schemeMap = parseScheme(scheme.pages).map;
     }
-    const qs = splitByNumbers(paperLines);
-    const items = (qs.length ? qs : [{ num: 1, text: paperLines.join('\n') }])
-      .map(c => ({ q: c.text, a: schemeMap.get(c.num) || '' }));
-    const matched = items.filter(i => i.a).length;
-    state.draft = {
-      title: (state.files.paper.name || 'Past paper').replace(/\.pdf$/i, ''),
-      items, leftover: schemeRaw
-    };
-    renderReview();
-    show('screen-review');
-    window.scrollTo({ top: 0 });
-    if (!qs.length) alert('Could not detect numbered questions — everything landed in one block. Use Split to break it up.');
-    else if (state.files.scheme && matched < items.length)
-      console.info(`Re-Wise: matched ${matched}/${items.length} answers`);
+    const parsed = parseQuestions(paper.pages);
+    if (!parsed.length) {
+      alert('Could not detect numbered questions in this paper. Check that the PDF has selectable text (not a scan).');
+      return;
+    }
+
+    $('busy-text').textContent = 'Capturing diagrams…';
+    const items = [];
+    for (let i = 0; i < parsed.length; i++) {
+      const it = parsed[i];
+      const text = it.lines.map(l => l.text).join('\n').trim();
+      const mcq = detectMcq(text);
+      let a = schemeMap.get(it.num) || '';
+      if (mcq) {
+        const letter = mcqLetterFrom(a);
+        if (letter) a = letter;              // MCQ answers are just the letter
+      }
+      const item = { q: text, a };
+      if (mcq) item.mcq = mcq;
+      const region = needsImage(it, parsed[i + 1], paper.pages[it.page]);
+      if (region) {
+        try {
+          const img = await renderRegion(paper.pdf, it.page, region.yTop, region.yEnd);
+          if (img) item.img = img;
+        } catch { /* text-only fallback */ }
+      }
+      items.push(item);
+    }
+
+    const title = (state.files.paper.name || 'Past paper').replace(/\.pdf$/i, '');
+    const saved = savePaper(title, items);
+    if (saved) {
+      resetUploadForm();
+      startQuiz(saved.id);
+    }
   } catch (err) {
     alert('Could not read that PDF: ' + (err && err.message ? err.message : err));
   } finally {
@@ -583,7 +737,58 @@ async function buildDraft() {
   }
 }
 
-/* ---------------- Review screen ---------------- */
+function savePaper(title, items) {
+  const data = store.read();
+  const paper = {
+    id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    title, created: Date.now(),
+    questions: items,
+    attempt: null
+  };
+  data.papers.unshift(paper);
+  if (!tryWrite(data, paper)) return null;
+  return paper;
+}
+
+/* localStorage quota guard: drop diagrams if the paper doesn't fit. */
+function tryWrite(data, paper) {
+  try { store.write(data); return true; }
+  catch (e) {
+    if (paper) {
+      for (const q of paper.questions) delete q.img;
+      try {
+        store.write(data);
+        alert('Storage is nearly full — this paper was saved without diagram images.');
+        return true;
+      } catch { /* fall through */ }
+    }
+    alert('Could not save: browser storage is full. Delete old papers and try again.');
+    return false;
+  }
+}
+
+function resetUploadForm() {
+  state.files = { paper: null, scheme: null };
+  $('file-paper').value = ''; $('file-scheme').value = '';
+  $('name-paper').textContent = 'Tap to choose, or drop the file here';
+  $('name-paper').classList.remove('is-set');
+  $('name-scheme').textContent = 'Tap to choose, or drop the file here';
+  $('name-scheme').classList.remove('is-set');
+  $('btn-extract').disabled = true;
+  $('extract-hint').textContent = 'Choose the past paper first';
+}
+
+/* ---------------- Review / edit screen (from the library) ---------------- */
+function openEditor(paperId) {
+  const p = store.read().papers.find(x => x.id === paperId);
+  if (!p) return;
+  state.editPaperId = paperId;
+  state.draft = { title: p.title, items: p.questions.map(q => ({ ...q })) };
+  renderReview();
+  show('screen-review');
+  window.scrollTo({ top: 0 });
+}
+
 function renderReview() {
   $('paper-title').value = state.draft.title;
   const wrap = $('rev-rows');
@@ -593,15 +798,17 @@ function renderReview() {
     row.className = 'row rev-item';
     row.innerHTML = `
       <div class="rev-item__head">
-        <span class="rev-item__num">${String(i + 1).padStart(2, '0')}</span>
+        <span class="rev-item__num">${String(i + 1).padStart(2, '0')}${item.mcq ? ' · MCQ' : ''}</span>
         <span class="rev-item__ops">
           <button class="tlink tlink--muted" data-op="merge" data-i="${i}" ${i === 0 ? 'disabled' : ''}>Merge &uarr;</button>
           <button class="tlink tlink--muted" data-op="split" data-i="${i}">Split at cursor</button>
+          ${item.img ? `<button class="tlink tlink--muted" data-op="unimg" data-i="${i}">Remove image</button>` : ''}
           <button class="tlink tlink--muted" data-op="del" data-i="${i}">Delete</button>
         </span>
       </div>
       <label class="label label--muted" for="q-${i}">Question</label>
       <textarea class="field" id="q-${i}" data-part="q" data-i="${i}" rows="4"></textarea>
+      ${item.img ? `<figure class="fig fig--thumb"><img src="${item.img}" alt="Diagram for question ${i + 1}"></figure>` : ''}
       <label class="label label--muted" for="a-${i}">Answer (marking scheme)</label>
       <textarea class="field ${item.a ? '' : 'field--quiet'}" id="a-${i}" data-part="a" data-i="${i}" rows="3"
         placeholder="No match found — paste the answer here"></textarea>`;
@@ -609,8 +816,6 @@ function renderReview() {
     row.querySelector(`#a-${i}`).value = item.a;
     wrap.appendChild(row);
   });
-  $('leftover-wrap').hidden = !state.draft.leftover;
-  $('leftover').textContent = state.draft.leftover || '';
 }
 
 document.addEventListener('input', (e) => {
@@ -627,9 +832,12 @@ $('rev-rows').addEventListener('click', (e) => {
   const items = state.draft.items;
   if (btn.dataset.op === 'del') {
     items.splice(i, 1);
+  } else if (btn.dataset.op === 'unimg') {
+    delete items[i].img;
   } else if (btn.dataset.op === 'merge' && i > 0) {
     items[i - 1].q = (items[i - 1].q + '\n' + items[i].q).trim();
-    items[i - 1].a = (items[i - 1].a + '\n' + items[i].a).trim();
+    items[i - 1].a = [items[i - 1].a, items[i].a].filter(Boolean).join('\n').trim();
+    if (!items[i - 1].img && items[i].img) items[i - 1].img = items[i].img;
     items.splice(i, 1);
   } else if (btn.dataset.op === 'split') {
     const ta = $(`q-${i}`);
@@ -638,10 +846,13 @@ $('rev-rows').addEventListener('click', (e) => {
       alert('Place the cursor inside the question text where the split should happen, then press Split.');
       return;
     }
-    const head = ta.value.slice(0, pos).trim();
-    const tail = ta.value.slice(pos).trim();
-    items[i].q = head;
-    items.splice(i + 1, 0, { q: tail, a: '' });
+    items[i].q = ta.value.slice(0, pos).trim();
+    items.splice(i + 1, 0, { q: ta.value.slice(pos).trim(), a: '' });
+  }
+  // Re-detect MCQ after structural edits
+  for (const it of items) {
+    const mcq = detectMcq(it.q);
+    if (mcq) it.mcq = mcq; else delete it.mcq;
   }
   renderReview();
 });
@@ -650,36 +861,44 @@ $('btn-add-q').addEventListener('click', () => {
   if (!state.draft) return;
   state.draft.items.push({ q: '', a: '' });
   renderReview();
-  const last = state.draft.items.length - 1;
-  $(`q-${last}`).focus();
+  $(`q-${state.draft.items.length - 1}`).focus();
 });
 
-function saveDraftAsPaper() {
-  const items = state.draft.items.filter(it => it.q.trim());
+function saveEdits() {
+  const items = state.draft.items.filter(it => it.q.trim())
+    .map(it => {
+      const clean = { ...it, q: it.q.trim(), a: it.a.trim() };
+      const mcq = detectMcq(clean.q);
+      if (mcq) {
+        clean.mcq = mcq;
+        const letter = mcqLetterFrom(clean.a);
+        if (letter) clean.a = letter;
+      } else delete clean.mcq;
+      return clean;
+    });
   if (!items.length) { alert('There are no questions to save.'); return null; }
   const data = store.read();
-  const paper = {
-    id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    title: ($('paper-title').value.trim() || 'Untitled paper'),
-    created: Date.now(),
-    questions: items.map(it => ({ q: it.q.trim(), a: it.a.trim() })),
-    attempt: null
-  };
-  data.papers.unshift(paper);
-  store.write(data);
-  state.draft = null;
-  return paper;
+  const p = data.papers.find(x => x.id === state.editPaperId);
+  if (!p) return null;
+  p.title = $('paper-title').value.trim() || p.title;
+  p.questions = items;
+  p.attempt = null; // edited paper starts fresh
+  if (!tryWrite(data, p)) return null;
+  const id = p.id;
+  state.draft = null; state.editPaperId = null;
+  return id;
 }
 
-$('btn-start').addEventListener('click', () => {
-  const paper = saveDraftAsPaper();
-  if (paper) startQuiz(paper.id);
+$('btn-save-start').addEventListener('click', () => {
+  const id = saveEdits();
+  if (id) startQuiz(id);
 });
-$('btn-save-later').addEventListener('click', () => {
-  if (saveDraftAsPaper()) { renderLibrary(); show('screen-home'); window.scrollTo({ top: 0 }); }
+$('btn-save-back').addEventListener('click', () => {
+  if (saveEdits()) { renderLibrary(); show('screen-home'); window.scrollTo({ top: 0 }); }
 });
 $('btn-cancel-review').addEventListener('click', () => {
-  if (confirm('Discard this extraction?')) { state.draft = null; show('screen-home'); }
+  state.draft = null; state.editPaperId = null;
+  renderLibrary(); show('screen-home');
 });
 
 /* ---------------- Library ---------------- */
@@ -694,6 +913,7 @@ function renderLibrary() {
   for (const p of data.papers) {
     const att = p.attempt;
     let status = `${p.questions.length} questions`;
+    if (p.questions.some(q => q.mcq)) status += ' · MCQ';
     if (att && att.finished) {
       const marked = att.marks.filter(m => m === 1).length;
       status += ` · last score ${marked} / ${p.questions.length}`;
@@ -710,6 +930,7 @@ function renderLibrary() {
       <div class="lib-row__actions">
         <button class="tlink" data-act="open" data-id="${p.id}">${att && !att.finished ? 'Continue' : 'Retake'}</button>
         ${att && att.finished ? `<button class="tlink tlink--muted" data-act="results" data-id="${p.id}">Results</button>` : ''}
+        <button class="tlink tlink--muted" data-act="edit" data-id="${p.id}">Edit</button>
         <button class="tlink tlink--muted" data-act="del" data-id="${p.id}">Delete</button>
       </div>`;
     row.querySelector('.lib-row__title').textContent = p.title;
@@ -726,6 +947,8 @@ $('lib-rows').addEventListener('click', (e) => {
     data.papers = data.papers.filter(p => p.id !== id);
     store.write(data);
     renderLibrary();
+  } else if (btn.dataset.act === 'edit') {
+    openEditor(id);
   } else if (btn.dataset.act === 'results') {
     state.paperId = id; renderResults(); show('screen-results'); window.scrollTo({ top: 0 });
   } else {
@@ -761,6 +984,7 @@ function startQuiz(id) {
     };
   });
   if (!p) return;
+  renderLibrary();
   show('screen-quiz');
   renderQuiz();
   window.scrollTo({ top: 0 });
@@ -770,21 +994,52 @@ function renderQuiz() {
   const p = getPaper();
   if (!p || !p.attempt) return;
   const i = p.attempt.index, n = p.questions.length;
+  const q = p.questions[i];
   const num = String(i + 1).padStart(2, '0');
   $('quiz-count').textContent = `Question ${num} / ${String(n).padStart(2, '0')}`;
   $('quiz-bar').style.width = `${((i + 1) / n) * 100}%`;
   $('quiz-num').textContent = num;
-  $('quiz-q').textContent = p.questions[i].q;
-  $('quiz-a').value = p.attempt.answers[i] || '';
+  $('quiz-q').textContent = q.q;
+
+  // Diagram
+  $('quiz-fig').hidden = !q.img;
+  if (q.img) $('quiz-fig-img').src = q.img;
+
+  // MCQ vs free text
+  if (q.mcq) {
+    $('quiz-answer-wrap').hidden = true;
+    $('quiz-mcq').hidden = false;
+    const chosen = p.attempt.answers[i];
+    $('quiz-choices').innerHTML = q.mcq.map(letter =>
+      `<button class="pill choice ${chosen === letter ? 'pill--on' : ''}" data-letter="${letter}"
+        aria-pressed="${chosen === letter}">${letter}</button>`).join('');
+  } else {
+    $('quiz-mcq').hidden = true;
+    $('quiz-answer-wrap').hidden = false;
+    $('quiz-a').value = p.attempt.answers[i] || '';
+  }
+
   const revealed = p.attempt.revealed[i];
   $('ms-block').hidden = !revealed;
   $('ms-text').textContent = revealed
-    ? (p.questions[i].a || 'No answer was provided for this question.') : '';
+    ? (q.a || 'No answer was provided for this question.') : '';
   $('btn-reveal').setAttribute('aria-expanded', String(revealed));
   $('btn-reveal').textContent = revealed ? 'Hide answer' : 'Reveal answer';
   $('btn-prev').disabled = i === 0;
   $('btn-next').textContent = i === n - 1 ? 'Finish paper' : 'Next question';
 }
+
+$('quiz-choices').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-letter]');
+  if (!btn) return;
+  const letter = btn.dataset.letter;
+  patchPaper(p => {
+    const i = p.attempt.index;
+    p.attempt.answers[i] = p.attempt.answers[i] === letter ? '' : letter;
+    p.attempt.updated = Date.now();
+  });
+  renderQuiz();
+});
 
 $('quiz-a').addEventListener('input', () => {
   patchPaper(p => { p.attempt.answers[p.attempt.index] = $('quiz-a').value; p.attempt.updated = Date.now(); });
@@ -812,8 +1067,21 @@ $('btn-quiz-exit').addEventListener('click', () => {
   renderLibrary(); show('screen-home'); window.scrollTo({ top: 0 });
 });
 
-/* ---------------- Results & self-marking ---------------- */
+/* ---------------- Results & marking ---------------- */
+/* MCQ rows are auto-checked (letter vs letter); everything else is self-marked. */
+function autoMarkMcq() {
+  patchPaper(p => {
+    p.questions.forEach((q, i) => {
+      if (!q.mcq || p.attempt.marks[i] !== null) return;
+      const yours = (p.attempt.answers[i] || '').trim().toUpperCase();
+      const right = (q.a || '').trim().toUpperCase();
+      if (yours && /^[A-E]$/.test(right)) p.attempt.marks[i] = (yours === right) ? 1 : 0;
+    });
+  });
+}
+
 function renderResults() {
+  autoMarkMcq();
   const p = getPaper();
   if (!p || !p.attempt) return;
   const wrap = $('res-rows');
@@ -824,13 +1092,14 @@ function renderResults() {
     const row = document.createElement('div');
     row.className = 'row row--quiet';
     row.innerHTML = `
-      <p class="label label--muted">Question ${String(i + 1).padStart(2, '0')}</p>
+      <p class="label label--muted">Question ${String(i + 1).padStart(2, '0')}${q.mcq ? ' · auto-checked' : ''}</p>
       <p class="res-row__q"></p>
+      ${q.img ? `<figure class="fig fig--thumb"><img src="${q.img}" alt="Diagram for question ${i + 1}"></figure>` : ''}
       <div class="res-cols">
         <div><span class="label label--muted">Your answer</span><p class="${yours ? '' : 'none'}"></p></div>
         <div><span class="label label--muted">Marking scheme</span><p class="${q.a ? '' : 'none'}"></p></div>
       </div>
-      <div class="res-mark" role="group" aria-label="Self-mark question ${i + 1}">
+      <div class="res-mark" role="group" aria-label="Mark question ${i + 1}">
         <button class="pill pill--sm ${mark === 1 ? 'pill--on' : ''}" data-mark="1" data-i="${i}" aria-pressed="${mark === 1}">Correct</button>
         <button class="pill pill--sm ${mark === 0 ? 'pill--on' : ''}" data-mark="0" data-i="${i}" aria-pressed="${mark === 0}">Wrong</button>
       </div>`;
@@ -848,8 +1117,11 @@ function updateScore() {
   const marked = p.attempt.marks.filter(m => m === 1).length;
   $('score-line').textContent = `${marked} / ${p.questions.length}`;
   const attempted = p.attempt.answers.filter(a => (a || '').trim()).length;
+  const hasMcq = p.questions.some(q => q.mcq);
   $('score-sub').textContent =
-    `You attempted ${attempted} of ${p.questions.length}. Mark each answer against the scheme — the score updates as you go.`;
+    `You attempted ${attempted} of ${p.questions.length}.` +
+    (hasMcq ? ' Multiple-choice answers are checked automatically; mark the rest yourself.'
+            : ' Mark each answer against the scheme — the score updates as you go.');
 }
 $('res-rows').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-mark]');
@@ -879,7 +1151,7 @@ function wireDropzone(zoneId, inputId, nameId, key) {
     name.classList.add('is-set');
     $('btn-extract').disabled = !state.files.paper;
     $('extract-hint').textContent = state.files.paper
-      ? (state.files.scheme ? 'Ready' : 'No scheme — you can paste answers during review')
+      ? (state.files.scheme ? 'Ready — starts right after reading' : 'No scheme — answers can be added later via Edit')
       : 'Choose the past paper first';
   };
   input.addEventListener('change', () => setFile(input.files[0]));
@@ -892,7 +1164,7 @@ function wireDropzone(zoneId, inputId, nameId, key) {
 }
 wireDropzone('dz-paper', 'file-paper', 'name-paper', 'paper');
 wireDropzone('dz-scheme', 'file-scheme', 'name-scheme', 'scheme');
-$('btn-extract').addEventListener('click', buildDraft);
+$('btn-extract').addEventListener('click', buildAndStart);
 
 /* ---------------- Screen switching ---------------- */
 function show(id) {
