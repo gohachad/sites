@@ -169,7 +169,9 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============ Sections ============ */
-.section { padding: var(--spacing-68) 0; }
+/* Vertical rhythm only — never override .container's horizontal padding
+   when both classes sit on the same element. */
+.section { padding-top: var(--spacing-68); padding-bottom: var(--spacing-68); }
 .section + .section { padding-top: 0; }
 .section__label { margin-bottom: var(--spacing-12); }
 .section__head { margin-bottom: var(--spacing-40); }
@@ -276,8 +278,9 @@ details.leftover pre {
   margin-top: var(--spacing-64);
   padding-top: var(--spacing-28);
   border-top: 1px solid #2e2e2e;
-  display: flex; flex-wrap: wrap; gap: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
+.qnav__row { display: flex; justify-content: center; gap: 10px; }
 .qnav__btn {
   width: 44px; height: 44px;
   border-radius: var(--radius-buttons);
@@ -1070,17 +1073,46 @@ function renderQuiz() {
   renderQnav(p);
 }
 
-/* Bottom navigator: one rounded button per question.
+/* Bottom navigator: one rounded button per question, laid out in equal,
+   centered rows (30 -> 15+15 or 10+10+10 depending on width; counts that
+   don't divide evenly get rows as equal as possible, e.g. 17 -> 9+8).
    Purple fill = answered, gray = not answered, ring = current. */
 function renderQnav(p) {
   const i = p.attempt.index;
-  $('qnav').innerHTML = p.questions.map((q, k) => {
+  const n = p.questions.length;
+  const BTN = 44, GAP = 10;
+  const width = $('qnav').clientWidth || 600;
+  const cap = Math.max(1, Math.floor((width + GAP) / (BTN + GAP)));
+  const rows = Math.ceil(n / cap);
+  const base = Math.floor(n / rows), extra = n % rows;
+
+  const btn = (k) => {
     const done = (p.attempt.answers[k] || '').trim() !== '';
     return `<button class="qnav__btn ${done ? 'qnav__btn--done' : ''} ${k === i ? 'qnav__btn--now' : ''}"
       data-goto="${k}" ${k === i ? 'aria-current="true"' : ''}
       aria-label="Question ${k + 1}${done ? ', answered' : ', not answered'}">${k + 1}</button>`;
-  }).join('');
+  };
+
+  let html = '', k = 0;
+  for (let r = 0; r < rows; r++) {
+    const count = base + (r < extra ? 1 : 0);
+    html += '<div class="qnav__row">';
+    for (let c = 0; c < count; c++) html += btn(k++);
+    html += '</div>';
+  }
+  $('qnav').innerHTML = html;
 }
+
+/* Re-balance the rows when the window size changes mid-quiz */
+let qnavResizeT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(qnavResizeT);
+  qnavResizeT = setTimeout(() => {
+    if ($('screen-quiz').hidden) return;
+    const p = getPaper();
+    if (p && p.attempt) renderQnav(p);
+  }, 150);
+});
 
 $('qnav').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-goto]');
