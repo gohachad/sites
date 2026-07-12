@@ -327,6 +327,14 @@ details.leftover pre {
 .footer { padding: var(--spacing-64) 0; }
 .footer p { font-size: 11px; line-height: 1.36; color: var(--color-ash-mist); margin-top: var(--spacing-8); }
 .footer a { color: var(--color-ash-mist); }
+.footer__inner { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--element-gap); }
+/* The easter egg: a quiet smoke break in the corner */
+.footer__egg {
+  height: 92px; width: auto; flex: none;
+  opacity: .5; filter: grayscale(1) contrast(.95);
+  transition: opacity .8s var(--ease-glide);
+}
+.footer__egg:hover { opacity: 1; }
 
 /* ============ Responsive ============ */
 @media (max-width: 900px) {
@@ -502,10 +510,14 @@ details.leftover pre {
 </main>
 
 <footer class="footer">
-  <div class="container">
-    <p class="label label--muted">Re-Wise</p>
-    <p>A client-side study tool. PDFs are parsed with pdf.js in your browser; papers, diagrams and progress live in this browser's storage only.</p>
-    <p><a href="../">Back to sites</a></p>
+  <div class="container footer__inner">
+    <div>
+      <p class="label label--muted">Re-Wise</p>
+      <p>A client-side study tool. PDFs are parsed with pdf.js in your browser; papers, diagrams and progress live in this browser's storage only.</p>
+      <p><a href="../">Back to sites</a></p>
+    </div>
+    <img class="footer__egg" src="mouse.gif" alt="A vintage cartoon mouse taking a smoke break"
+      title="Take a break — you've earned it" width="224" height="262" loading="lazy">
   </div>
 </footer>
 
