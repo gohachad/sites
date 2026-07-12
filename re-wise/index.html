@@ -271,6 +271,31 @@ details.leftover pre {
 .ms-block[hidden] { display: none; }
 .ms-block p { white-space: pre-wrap; font-size: var(--text-body-sm); line-height: 1.58; color: #d6d6d6; max-width: 42em; margin-top: var(--spacing-8); }
 
+/* ============ Question navigator (bottom of the quiz) ============ */
+.qnav {
+  margin-top: var(--spacing-64);
+  padding-top: var(--spacing-28);
+  border-top: 1px solid #2e2e2e;
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.qnav__btn {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-buttons);
+  border: 1px solid #3a3a3a;
+  background: #242424;                 /* no answer yet — gray */
+  color: var(--color-ash-mist);
+  font-family: var(--font-roobert); font-size: 14px; font-weight: var(--font-weight-regular);
+  cursor: pointer;
+  transition: background-color .4s ease, color .4s ease, border-color .4s ease;
+}
+.qnav__btn:hover { border-color: var(--color-paper); color: var(--color-paper); }
+.qnav__btn--done {                     /* answered — purple */
+  background: #9333ea;
+  border-color: transparent;
+  color: var(--color-paper);
+}
+.qnav__btn--now { outline: 2px solid var(--color-paper); outline-offset: 2px; }
+
 /* ============ Results ============ */
 .score {
   font-size: clamp(48px, 9vw, var(--text-heading));
@@ -451,6 +476,8 @@ details.leftover pre {
         <span class="label">Marking scheme</span>
         <p id="ms-text"></p>
       </div>
+
+      <nav class="qnav" id="qnav" aria-label="Jump to a question"></nav>
     </div>
   </section>
 
@@ -1040,7 +1067,28 @@ function renderQuiz() {
   $('btn-reveal').textContent = revealed ? 'Hide answer' : 'Reveal answer';
   $('btn-prev').disabled = i === 0;
   $('btn-next').textContent = i === n - 1 ? 'Finish paper' : 'Next question';
+  renderQnav(p);
 }
+
+/* Bottom navigator: one rounded button per question.
+   Purple fill = answered, gray = not answered, ring = current. */
+function renderQnav(p) {
+  const i = p.attempt.index;
+  $('qnav').innerHTML = p.questions.map((q, k) => {
+    const done = (p.attempt.answers[k] || '').trim() !== '';
+    return `<button class="qnav__btn ${done ? 'qnav__btn--done' : ''} ${k === i ? 'qnav__btn--now' : ''}"
+      data-goto="${k}" ${k === i ? 'aria-current="true"' : ''}
+      aria-label="Question ${k + 1}${done ? ', answered' : ', not answered'}">${k + 1}</button>`;
+  }).join('');
+}
+
+$('qnav').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-goto]');
+  if (!btn) return;
+  patchPaper(p => { p.attempt.index = +btn.dataset.goto; });
+  renderQuiz();
+  window.scrollTo({ top: 0 });
+});
 
 $('quiz-choices').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-letter]');
@@ -1055,7 +1103,8 @@ $('quiz-choices').addEventListener('click', (e) => {
 });
 
 $('quiz-a').addEventListener('input', () => {
-  patchPaper(p => { p.attempt.answers[p.attempt.index] = $('quiz-a').value; p.attempt.updated = Date.now(); });
+  const p = patchPaper(p => { p.attempt.answers[p.attempt.index] = $('quiz-a').value; p.attempt.updated = Date.now(); });
+  if (p) renderQnav(p); // keep the navigator's purple/gray state live while typing
 });
 $('btn-reveal').addEventListener('click', () => {
   patchPaper(p => { p.attempt.revealed[p.attempt.index] = !p.attempt.revealed[p.attempt.index]; });
