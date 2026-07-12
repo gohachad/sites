@@ -548,12 +548,15 @@ async function extractPages(file) {
         .join(' ').replace(/\.{4,}/g, ' ').replace(/\s+/g, ' ').trim();
       if (!isNoise(text)) lines.push({ y, text });
     }
-    let hasImages = false;
+    let hasImages = false, pathCount = 0;
     try {
       const ops = await page.getOperatorList();
       hasImages = ops.fnArray.some(fn => imgOps.has(fn));
-    } catch { /* keep false */ }
-    pages.push({ index: p - 1, lines, hasImages });
+      pathCount = ops.fnArray.filter(fn => fn === pdfjsLib.OPS.constructPath).length;
+    } catch { /* keep defaults */ }
+    // Tables, graphs and drawn diagrams are made of many vector paths;
+    // plain text pages have almost none.
+    pages.push({ index: p - 1, lines, hasImages, graphicsHeavy: pathCount >= 10 });
   }
   return { pdf, pages };
 }
@@ -605,7 +608,7 @@ function detectMcq(text) {
    captured as a picture. Otherwise fall back to layout heuristics: a large
    vertical gap between text lines, or raster images on the page.
    Gap thresholds are in PDF points. */
-const FIG_MENTION = /\b(diagrams?|figures?|fig\.|graphs?|images?|photographs?|pictures?|maps?|charts?|sketch(es)?|illustrations?|shown (below|above))/i;
+const FIG_MENTION = /\b(diagrams?|figures?|fig\.|graphs?|images?|photographs?|pictures?|maps?|charts?|tables?|grids?|sketch(es)?|illustrations?|shown (below|above))/i;
 
 function needsImage(item, nextItem, page, text) {
   const onPage = item.lines.filter(l => l.page === item.page);
@@ -614,6 +617,10 @@ function needsImage(item, nextItem, page, text) {
 
   // Mentioning a figure forces capture, trailing page space included.
   if (FIG_MENTION.test(text)) return region;
+
+  // A page full of vector paths is drawn content (tables, graphs, diagrams):
+  // capture every question that starts on it. Over-capturing beats losing a figure.
+  if (page.graphicsHeavy) return region;
 
   const regionH = item.yTop - yEnd;
   if (regionH < 80) return null;
