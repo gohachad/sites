@@ -601,12 +601,20 @@ function detectMcq(text) {
 }
 
 /* ---------------- Diagram capture ---------------- */
-/* A question region likely holds a diagram when there is a large vertical gap
-   between its text lines (or before the next question), or the page carries
-   raster images. Gap thresholds are in PDF points. */
-function needsImage(item, nextItem, page) {
+/* HARD RULE: a question that mentions a diagram/figure/graph/image is always
+   captured as a picture. Otherwise fall back to layout heuristics: a large
+   vertical gap between text lines, or raster images on the page.
+   Gap thresholds are in PDF points. */
+const FIG_MENTION = /\b(diagrams?|figures?|fig\.|graphs?|images?|photographs?|pictures?|maps?|charts?|sketch(es)?|illustrations?|shown (below|above))/i;
+
+function needsImage(item, nextItem, page, text) {
   const onPage = item.lines.filter(l => l.page === item.page);
   const yEnd = (nextItem && nextItem.page === item.page) ? nextItem.yTop + 14 : 40;
+  const region = { yTop: Math.min(item.yTop + 16, 830), yEnd: Math.max(yEnd, 30) };
+
+  // Mentioning a figure forces capture, trailing page space included.
+  if (FIG_MENTION.test(text)) return region;
+
   const regionH = item.yTop - yEnd;
   if (regionH < 80) return null;
   const ys = onPage.map(l => l.y).sort((a, b) => b - a);
@@ -615,9 +623,7 @@ function needsImage(item, nextItem, page) {
   if (nextItem && nextItem.page === item.page) ys.push(yEnd);
   let maxGap = 0;
   for (let k = 0; k < ys.length - 1; k++) maxGap = Math.max(maxGap, ys[k] - ys[k + 1]);
-  if (maxGap > 110 || (page.hasImages && maxGap > 60)) {
-    return { yTop: Math.min(item.yTop + 16, 830), yEnd: Math.max(yEnd, 30) };
-  }
+  if (maxGap > 110 || (page.hasImages && maxGap > 60)) return region;
   return null;
 }
 
@@ -713,7 +719,7 @@ async function buildAndStart() {
       }
       const item = { q: text, a };
       if (mcq) item.mcq = mcq;
-      const region = needsImage(it, parsed[i + 1], paper.pages[it.page]);
+      const region = needsImage(it, parsed[i + 1], paper.pages[it.page], text);
       if (region) {
         try {
           const img = await renderRegion(paper.pdf, it.page, region.yTop, region.yEnd);
