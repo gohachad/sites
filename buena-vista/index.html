@@ -58,11 +58,11 @@ html{scroll-behavior:smooth}body{font-family:var(--font-body);background:var(--b
 .atmosphere-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,60px);align-items:center}
 @media(max-width:768px){.atmosphere-grid{grid-template-columns:1fr}}
 .atmosphere-visual{position:relative;aspect-ratio:4/5;overflow:hidden}.atmosphere-visual-inner{position:relative;width:100%;height:100%}
-.photo-mock{position:absolute;overflow:hidden;transition:background .4s,border-color .4s}
-.photo-mock--1{top:0;left:0;width:65%;height:60%;border-radius:24px;background:linear-gradient(135deg,var(--green)0%,var(--green-dark)100%)}
-.photo-mock--2{bottom:0;right:0;width:70%;height:55%;border-radius:24px;background:linear-gradient(135deg,var(--terracotta)0%,var(--terracotta-light)100%);z-index:1}
-.photo-mock--3{top:30%;right:-8%;width:45%;height:35%;border-radius:20px;background:linear-gradient(135deg,var(--gold)0%,var(--gold-light)100%);z-index:2;box-shadow:var(--shadow)}
-.photo-mock-label{position:absolute;bottom:16px;left:16px;font-size:14px;color:rgba(255,255,255,.7);font-family:var(--font-display);font-style:italic}
+.photo-mock{position:absolute;overflow:hidden;transition:border-color .4s;border-radius:24px}
+.photo-mock img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-mock--1{top:0;left:0;width:65%;height:60%;border:1px solid var(--border)}
+.photo-mock--2{bottom:0;right:0;width:70%;height:55%;z-index:1;border:1px solid var(--border)}
+.photo-mock--3{top:30%;right:-8%;width:45%;height:35%;z-index:2;box-shadow:var(--shadow);border:1px solid var(--border)}
 .atmosphere-text h2{font-family:var(--font-display);font-size:clamp(32px,5vw,56px);line-height:1.1;color:var(--green);transition:color .4s}
 [data-theme="dark"] .atmosphere-text h2{color:var(--gold-light)}.atmosphere-text h2 .accent{color:var(--terracotta);font-style:italic}[data-theme="dark"] .atmosphere-text h2 .accent{color:var(--gold)}
 .atmosphere-text p{margin-top:20px;font-size:17px;line-height:1.75;color:var(--text-secondary)}
@@ -176,9 +176,9 @@ html{scroll-behavior:smooth}body{font-family:var(--font-body);background:var(--b
   <div class="atmosphere-grid reveal">
     <div class="atmosphere-visual">
       <div class="atmosphere-visual-inner">
-        <div class="photo-mock photo-mock--1"><span class="photo-mock-label">Street food roots</span></div>
-        <div class="photo-mock photo-mock--2"><span class="photo-mock-label">Craft cocktails</span></div>
-        <div class="photo-mock photo-mock--3"><span class="photo-mock-label">Your event</span></div>
+        <div class="photo-mock photo-mock--1"><img src="images/interior.jpg" alt="Buena Vista restaurant interior" loading="lazy"></div>
+        <div class="photo-mock photo-mock--2"><img src="images/tacos.jpg" alt="Tacos al Pastor" loading="lazy"></div>
+        <div class="photo-mock photo-mock--3"><img src="images/cocktail.jpg" alt="Signature cocktail" loading="lazy"></div>
       </div>
     </div>
     <div class="atmosphere-text">
