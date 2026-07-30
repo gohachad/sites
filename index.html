@@ -356,6 +356,7 @@ img{max-width:100%;display:block}
       <h3>Request a booking</h3>
       <p class="form-note">Tell us about your event &mdash; we'll get back to you within 24 hours.</p>
       <form id="bookingForm">
+        <input type="text" name="website" id="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;border:0;padding:0">
         <div class="form-row-2">
           <div class="form-group"><label for="name">Your name</label><input type="text" id="name" name="name" placeholder="Maria Lopez" required></div>
           <div class="form-group"><label for="email">Email or phone</label><input type="text" id="email" name="email" placeholder="maria@example.com" required></div>
@@ -496,16 +497,44 @@ img{max-width:100%;display:block}
     document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('visible'); });
   }
 
-  // Booking form
+  // Booking form → n8n webhook
+  var BOOKING_URL = 'https://gohan8n.lol/webhook/buena-vista-booking';
   var form = document.getElementById('bookingForm');
   var toast = document.getElementById('toast');
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(function(){ toast.classList.remove('show'); }, 6000);
+  }
   if(form){
     form.addEventListener('submit', function(e){
       e.preventDefault();
-      toast.textContent = 'Thanks! We’ll get back to you within 24 hours.';
-      toast.classList.add('show');
-      setTimeout(function(){ toast.classList.remove('show'); }, 4000);
-      form.reset();
+      var btn = form.querySelector('.form-submit');
+      var payload = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        date: document.getElementById('date').value,
+        guests: document.getElementById('guests').value,
+        eventType: document.getElementById('eventType').value,
+        message: document.getElementById('message').value.trim(),
+        website: document.getElementById('website').value
+      };
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      fetch(BOOKING_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      }).then(function(res){
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+        showToast('Thanks! We’ll get back to you within 24 hours.');
+        form.reset();
+      }).catch(function(){
+        showToast('Something went wrong — please call us at 621 707 656.');
+      }).finally(function(){
+        btn.disabled = false;
+        btn.textContent = 'Send request';
+      });
     });
   }
 })();
